@@ -1,0 +1,8 @@
+{
+    "main": "NexMain.js",
+    "dependencies": {
+        "discord.js": "^11.3.2",
+        "isomorphic-fetch": "^2.2.1",
+        "whatwg-fetch": "^2.0.4"
+    }
+}

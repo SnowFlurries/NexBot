@@ -1,5 +1,6 @@
 const fetch = require('isomorphic-fetch');
 const Discord = require('discord.js');
+const columnify = require('columnify');
 const {prefix, token} = require('../config.json');
 const client = new Discord.Client();
 // Runescape IDs of nex unique items
@@ -51,19 +52,43 @@ client.on('message', msg => {
 // Retrieves item data from RS db
 async function getData() {
     var tmp;
+    var data = []
     var fmt_string = `\`\`\``
 
-    // not sure if await is necessary; makes it return items in the same order each time but it may take longer?
-    for (var i = 0; i < item_id.length; i ++) {
-        await fetch(`http://services.runescape.com/m=itemdb_rs/api/catalogue/detail.json?item=${item_id[i]}`)
+    await Promise.all(item_id.map(async item => {
+        await fetch(`http://services.runescape.com/m=itemdb_rs/api/catalogue/detail.json?item=${item}`)
         .then((res) => res.text())
         .then((resText) => {
             tmp = JSON.parse(resText)
             // Retrieve the required values from JSON
-            fmt_string += `${tmp['item']['name']}\t\t\t ${tmp['item']['current']['price']}\n`
+            data.push({name: tmp['item']['name'], value: tmp['item']['current']['price']})
         });
-    }
-    fmt_string += `\`\`\``
+    }));
+    
+    
+    data.sort((a, b) => {
+        var name_a = a.name.toLowerCase();
+        var name_b = b.name.toLowerCase();
+
+        if (name_a < name_b){
+            return -1;
+        }
+        else if (name_a > name_b) {
+            return 1;
+        }
+        return 0;
+    });
+
+    var columns = columnify(data, {
+        columns: ['name', 'value'],
+        minWidth: 10,
+        columnSplitter: '  | ',
+        config : {
+            value: {align: 'right'}
+        }
+    })
+    fmt_string += columns;
+    fmt_string += `\`\`\``;
 
     // Returns the final prices formatted in a code block
     return fmt_string;

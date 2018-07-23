@@ -1,6 +1,6 @@
 const fetch = require('isomorphic-fetch');
 const Discord = require('discord.js');
-const {prefix, token} = require('./config.json');
+const {prefix, token} = require('../config.json');
 const client = new Discord.Client();
 // Runescape IDs of nex unique items
 const item_id = [20147, 20159, 20151, 25068, 20155, 25058, 20135, 20139, 20143, 25060, 25064, 20163, 20167, 25062, 25066, 25664, 25654, 20171];
@@ -16,12 +16,36 @@ client.on('message', msg => {
     // Getting the command following the prefix
     const args = msg.content.slice(prefix.length + 1).split(/ +/);
     const cmd = args.shift().toLowerCase();
-
+    console.log(cmd)
     // Unique drop prices
     if (cmd === 'drops') {
-        getData()
-        .then((result) => msg.channel.send(result));
-    }  
+        msg.channel.send('Fetching data...')
+        .then((return_msg) => {
+            getData()
+            .then((result) => return_msg.edit(result));
+        })
+    }
+
+    // Regular duo guide
+    else if (cmd === 'duo') {
+        msg.channel.send({
+            file: "../assets/nex_duo_guide.png"
+        })
+    }
+
+    // Advanced duo guide
+    else if (cmd === 'duo-adv') {
+        msg.channel.send({
+            file: "../assets/nex_duo_advanced.png"
+        })
+    }
+
+    // Nex Preset
+    else if (cmd === 'preset') {
+        msg.channel.send({
+            file: "../assets/nex_preset.png"
+        })
+    }
 })
 
 // Retrieves item data from RS db

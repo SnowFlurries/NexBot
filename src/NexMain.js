@@ -1,8 +1,14 @@
 const fetch = require('isomorphic-fetch');
 const Discord = require('discord.js');
 const columnify = require('columnify');
+const NodeCache = require('node-cache');
+
 const {prefix, token} = require('../config.json');
 const client = new Discord.Client();
+
+// TODO: Change ttl and checkperiod vals once done testing
+const item_cache = new NodeCache({ stdTTL: 15, checkperiod: 15 });
+
 // Runescape IDs of nex unique items
 const item_id = [20147, 20159, 20151, 25068, 20155, 25058, 20135, 20139, 20143, 25060, 25064, 20163, 20167, 25062, 25066, 25664, 25654, 20171];
 
@@ -17,13 +23,34 @@ client.on('message', msg => {
     // Getting the command following the prefix
     const args = msg.content.slice(prefix.length + 1).split(/ +/);
     const cmd = args.shift().toLowerCase();
-    console.log(cmd)
+
     // Unique drop prices
     if (cmd === 'drops') {
         msg.channel.send('Fetching data...')
         .then((return_msg) => {
-            getData()
-            .then((result) => return_msg.edit(result));
+            // Retrieve drop info from cache
+            item_cache.get("drops", function( err, value ) {
+                if (!err) {
+                    if (value == undefined) {
+                        // Values don't exist -- have been deleted
+                        getData()
+                        .then((result) => {
+                            // Cache new values
+                            item_cache.set("drops", result, function(error, success) {
+                                if (!error && success) {
+                                    console.log("Item results cached")
+                                    return_msg.edit(result)
+                                }
+                            })
+                        })
+                    } else {
+                        // Values exist. Edit original message with result
+                        return_msg.edit(value)
+                    }
+                } else {
+                    return_msg.edit("Data could not be retrieved. Please try again later.")
+                }
+            })
         })
     }
 
@@ -55,15 +82,19 @@ async function getData() {
     var data = []
     var fmt_string = `\`\`\``
 
-    await Promise.all(item_id.map(async item => {
-        await fetch(`http://services.runescape.com/m=itemdb_rs/api/catalogue/detail.json?item=${item}`)
-        .then((res) => res.text())
-        .then((resText) => {
-            tmp = JSON.parse(resText)
-            // Retrieve the required values from JSON
-            data.push({name: tmp['item']['name'], value: tmp['item']['current']['price']})
-        });
-    }));
+    try {
+        await Promise.all(item_id.map(async item => {
+            await fetch(`http://services.runescape.com/m=itemdb_rs/api/catalogue/detail.json?item=${item}`)
+            .then((res) => res.text())
+            .then((resText) => {
+                tmp = JSON.parse(resText)
+                // Retrieve the required values from JSON
+                data.push({name: tmp['item']['name'], value: tmp['item']['current']['price']})
+            });
+        }));
+    } catch (err) {
+        return 'Could not fetch data, please try again later.'
+    }
     
     
     data.sort((a, b) => {
@@ -82,8 +113,8 @@ async function getData() {
     var columns = columnify(data, {
         columns: ['name', 'value'],
         minWidth: 10,
-        columnSplitter: '  | ',
-        config : {
+        columnSplitter: '  |',
+        config: {
             value: {align: 'right'}
         }
     })

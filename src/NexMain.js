@@ -3,6 +3,8 @@ const Discord = require('discord.js'); // Discord bot module
 const columnify = require('columnify'); // Column formatting
 const NodeCache = require('node-cache'); // Caching data
 const numeral = require('numeral'); // Formatting numbers
+var GoogleSpreadsheet = require('google-spreadsheet'); // Google sheets module
+var async = require('async'); // Used for async series
 
 /**
  * prefix - string the bot listens for
@@ -15,6 +17,9 @@ const client = new Discord.Client();
 // TODO: Change ttl and checkperiod vals once done testing
 const item_cache = new NodeCache({ stdTTL: 15, checkperiod: 15 });
 
+
+var doc = new GoogleSpreadsheet('1RnVGPcgEElxxjju39YRdfw6ZhnTwh3vkZQektsj6S1g');
+var sheet;
 
 client.on('ready', () => {
     console.log(`Logged in as ${client.user.tag}!`);
@@ -36,7 +41,7 @@ client.on('message', msg => {
             item_cache.get("drops", function( err, value ) {
                 if (!err) {
                     if (value == undefined) {
-                        // Values don't exist -- have been deleted
+                        // Values don't exist -- cache has been deleted
                         getData(id_data['unique_ids'])
                         .then((result) => {
                             // Cache new values
@@ -58,14 +63,15 @@ client.on('message', msg => {
         })
     }
 
-    if (cmd === 'commons') {
+    // All non unique drops
+    else if (cmd === 'commons') {
         msg.channel.send('Fetching data...')
         .then((return_msg) => {
             // Retrieve drop info from cache
             item_cache.get("commons", function( err, value ) {
                 if (!err) {
                     if (value == undefined) {
-                        // Values don't exist -- have been deleted
+                        // Values don't exist -- cache has been deleted
                         getData(id_data['common_ids'])
                         .then((result) => {
                             // Cache new values
@@ -107,7 +113,127 @@ client.on('message', msg => {
             file: "../assets/nex_preset.png"
         })
     }
+
+    // Nex records
+    else if (cmd === 'records') {
+        msg.channel.send('Loading records...')
+        .then((return_msg) => {
+            const trio_data = []
+            const duo_data = []
+            const solo_data = []
+            
+            // Execute functions in order
+            async.series([ function getInfoAndWorksheets(step) {
+                doc.getInfo(function(err, info) {
+                    sheet = info.worksheets[16] // Worksheet 16 is the nex page
+                    step();
+                })
+            },
+            async function trioData(step) {
+                sheet.getCells({
+                    'min-row': 3,
+                    'max-row': 6,
+                    'max-col': 6,
+                    'return-empty': true
+                }, await function(err, cells) {
+                    var rowNum = 3
+                    var tmp = []
+                    // Add each relevant cell to array
+                    for (var i = 0; i < cells.length; i++) {
+                        if (cells[i].row > rowNum) {
+                            rowNum++
+                            trio_data.push({ 
+                                rank: tmp[0], 
+                                time: tmp[1], 
+                                player_1: tmp[2], 
+                                player_2: tmp[3], 
+                                player_3: tmp[4], 
+                                date: tmp[5]
+                                })
+                            tmp = []
+                        }
+                        // Tmp array holds each row
+                        tmp.push(cells[i].value)
+                    }
+                    step();
+                })
+            },
+            
+            async function duoData(step) {
+                sheet.getCells({
+                    'min-row': 10,
+                    'max-row': 13,
+                    'max-col': 5,
+                    'return-empty': true
+                }, await function(err, cells) {
+                    var rowNum = 10
+                    var tmp = []
+                    // Same as for trio, just without  player_3
+                    for (var i = 0; i < cells.length; i++) {
+                        if (cells[i].row > rowNum) {
+                            rowNum++
+                            duo_data.push({ 
+                                rank: tmp[0], 
+                                time: tmp[1], 
+                                player_1: tmp[2], 
+                                player_2: tmp[3], 
+                                date: tmp[4]
+                            })
+                            tmp = []
+                        }
+                        tmp.push(cells[i].value)
+                    }
+                    step();
+                })
+            },
+            
+            async function soloData(step){
+                sheet.getCells({
+                    'min-row': 17,
+                    'max-row': 20,
+                    'max-col': 4,
+                    'return-empty': true
+                }, await function(err, cells) {
+                    var rowNum = 17
+                    var tmp = []
+                    // Same as for duo, just without player_2
+                    for (var i = 0; i < cells.length; i++) {
+                        if (cells[i].row > rowNum) {
+                            rowNum++
+                            solo_data.push({ rank: tmp[0], time: tmp[1], player_1: tmp[2], date: tmp[3]})
+                            tmp = []
+                        }
+                        tmp.push(cells[i].value)
+                    }
+                    step()
+                })
+            },
+            function results(step) {
+                // Neatly arrange all the rows for the response 
+                var trio_columns = columnify(trio_data, {
+                    columns: ['rank', 'time', 'player_1', 'player_2', 'player_3', 'date'],
+                    minWidth: 5,
+                    columnSplitter: ' | '
+                })
+
+                var duo_columns = columnify(duo_data, {
+                    columns: ['rank', 'time', 'player_1', 'player_2', 'date'],
+                    minWidth: 5,
+                    columnSplitter: ' | '
+                })
+                var solo_columns = columnify(solo_data, {
+                    columns: ['rank', 'time', 'player_1', 'date'],
+                    minWidth: 5,
+                    columnSplitter: ' | '
+                })
+                // Building return string
+                records_results = '**Trio**:```\n' + trio_columns + '```\n**Duo**:```\n' + duo_columns + '```\n**Solo**:```\n' + solo_columns + '```'
+                return_msg.edit(records_results)
+            }])
+        })
+    }
 })
+
 
 async function getData(id_array) {
     var data = [] // result array

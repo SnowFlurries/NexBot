@@ -5,6 +5,7 @@
         "discord.js": "^11.3.2",
         "isomorphic-fetch": "^2.2.1",
         "node-cache": "^4.2.0",
+        "numeral": "^2.0.6",
         "whatwg-fetch": "^2.0.4"
     }
 }

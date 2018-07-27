@@ -1,2 +1,1 @@
-# NexBot
-Discord bot
+# NexBot\nDiscord bot

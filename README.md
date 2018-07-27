@@ -1,1 +1,2 @@
 # NexBot
+Discord bot

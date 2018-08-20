@@ -125,7 +125,7 @@ client.on('message', msg => {
             // Execute functions in order
             async.series([ function getInfoAndWorksheets(step) {
                 doc.getInfo(function(err, info) {
-                    sheet = info.worksheets[16] // Worksheet 16 is the nex page
+                    sheet = info.worksheets[17] // Worksheet 16 is the nex page
                     step();
                 })
             },
